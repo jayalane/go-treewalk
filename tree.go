@@ -17,8 +17,8 @@ import (
 // search, or name would be the object Key and the path would be the
 // account ID and the bucket name (for S3)
 type StringPath struct {
-	name string
-	path []string
+	Name string
+	Path []string
 }
 
 // Callback is the thing called for each string read from a channel; it can do anything (print a file)
@@ -55,10 +55,10 @@ func New(firstString string, depth int) Treewalk {
 }
 
 func (t Treewalk) defaultDirHandle(sp StringPath, chs []chan StringPath, wg *sync.WaitGroup) {
-	fullPath := append(sp.path, sp.name)
+	fullPath := append(sp.Path, sp.Name)
 	des, err := os.ReadDir(strings.Join(fullPath, "/"))
 	if err != nil {
-		t.log.La("Error on ReadDir", sp.name, err)
+		t.log.La("Error on ReadDir", sp.Name, err)
 		return
 	}
 	count.Incr("dir-handler-readdir-ok")
@@ -68,13 +68,13 @@ func (t Treewalk) defaultDirHandle(sp StringPath, chs []chan StringPath, wg *syn
 		if de.IsDir() {
 			count.Incr("dir-handler-dirent-got-dir")
 			wg.Add(1)
-			pathNew := append(sp.path, sp.name)
+			pathNew := append(sp.Path, sp.Name)
 			spNew := StringPath{de.Name(), pathNew}
 			chs[0] <- spNew
 		} else {
 			count.Incr("dir-handler-dirent-got-not-dir")
 			wg.Add(1)
-			pathNew := append(sp.path, sp.name)
+			pathNew := append(sp.Path, sp.Name)
 			spNew := StringPath{de.Name(), pathNew}
 			chs[1] <- spNew
 		}
