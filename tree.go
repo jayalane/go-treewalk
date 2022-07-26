@@ -3,6 +3,7 @@
 package treewalk
 
 import (
+	"fmt"
 	count "github.com/jayalane/go-counter"
 	lll "github.com/jayalane/go-lll"
 	"os"
@@ -29,6 +30,7 @@ type Callback func(StringPath, []chan StringPath, *sync.WaitGroup)
 // Treewalk keeps the state involved in walking thru a tree like dataflow
 type Treewalk struct {
 	firstString string
+	numWorkers  []int
 	cbs         []Callback
 	chs         []chan StringPath
 	lock        *sync.RWMutex
@@ -44,8 +46,10 @@ func New(firstString string, depth int) Treewalk {
 	res.cbs = make([]Callback, depth)
 	res.cbs[0] = nil // unneeded
 	res.chs = make([]chan StringPath, depth)
+	res.numWorkers = make([]int, depth)
 	for i := 0; i < depth; i++ {
 		res.chs[i] = make(chan StringPath, 1000000)
+		res.numWorkers[i] = 5 // default?
 	}
 	res.depth = depth
 	res.lock = &sync.RWMutex{}
@@ -88,11 +92,25 @@ func (t Treewalk) SetHandler(level int, cb Callback) { // int before func for fo
 	t.cbs[level] = cb
 }
 
+// SetNumWorkers overrides the number of go routines for each layer (default 5)
+func (t Treewalk) SetNumWorkers(numWorkers []int) {
+	if len(numWorkers) != t.depth {
+		s := fmt.Sprintln("numWorkers length", len(numWorkers), "differs from depth", t.depth)
+		panic(s)
+	}
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	for i, n := range numWorkers {
+		t.log.La("Setting layer", i, "to", n, "workers")
+		t.numWorkers[i] = n
+	}
+}
+
 // Start starts the go routines for the processing
 func (t Treewalk) Start() {
 	t.wg.Add(1)
 	for i := 0; i < t.depth; i++ {
-		for j := 0; j < 1; j++ {
+		for j := 0; j < t.numWorkers[i]; j++ {
 			t.wg.Add(1)
 			go func(layer int) {
 				t.log.La("Starting go routine for tree walk depth", layer)
