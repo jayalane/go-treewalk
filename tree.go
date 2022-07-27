@@ -14,9 +14,12 @@ import (
 // MaxDepth is the greatest depth of layers you can have
 const MaxDepth = 5
 
-// MaxPathDepth is the largest number of path segments that will be seen for th
+// maxPathDepth is the largest number of path segments that will be seen for th
 // default handler
 const maxPathDepth = 50
+
+// maxSplits is the largest number of directory names that can be skipped
+const maxSplits = 10
 
 // StringPath is a string that's the current layer ID and the previous
 // layers IDs needed to get to this one. e.g. name would be the file
@@ -39,6 +42,7 @@ type Treewalk struct {
 	numWorkers  []int
 	cbs         []Callback
 	chs         []chan StringPath
+	skips       []string
 	lock        *sync.RWMutex
 	log         lll.Lll
 	wg          *sync.WaitGroup
@@ -95,6 +99,7 @@ func New(firstString string, depth int) Treewalk {
 	res.cbs[0] = nil // unneeded
 	res.chs = make([]chan StringPath, depth)
 	res.numWorkers = make([]int, depth)
+	res.skips = make([]string, maxSplits)
 	for i := 0; i < depth; i++ {
 		res.chs[i] = make(chan StringPath, 1000000)
 		res.numWorkers[i] = 5 // default?
@@ -104,6 +109,18 @@ func New(firstString string, depth int) Treewalk {
 	res.wg = &sync.WaitGroup{}
 	res.log = lll.Init("Treewalk", "network") // should be settable
 	return res
+}
+
+func (t Treewalk) skipDir(dir string) bool {
+	t.log.La("Checking", dir, "for skipping")
+	t.log.La("List of skips is", t.skips)
+	for _, x := range t.skips {
+		t.log.La("Got x", x)
+		if x == dir {
+			return true
+		}
+	}
+	return false
 }
 
 func (t Treewalk) defaultDirHandle(sp StringPath, chs []chan StringPath, wg *sync.WaitGroup) {
@@ -123,6 +140,11 @@ func (t Treewalk) defaultDirHandle(sp StringPath, chs []chan StringPath, wg *syn
 		myCopy(&tmp, pathNew)
 		if de.IsDir() {
 			count.Incr("dir-handler-dirent-got-dir")
+			if t.skipDir(de.Name()) {
+				t.log.Ls("Skipping", de.Name())
+				count.Incr("dir-handler-dirent-skip")
+				continue
+			}
 			wg.Add(1)
 			spNew := StringPath{de.Name(), tmp}
 			chs[0] <- spNew
@@ -154,6 +176,16 @@ func (t Treewalk) SetNumWorkers(numWorkers []int) {
 		t.log.La("Setting layer", i, "to", n, "workers")
 		t.numWorkers[i] = n
 	}
+}
+
+// SetSkipDirs takes a slice of strings of directories to skip over
+// in the default layer 0 handler
+func (t *Treewalk) SetSkipDirs(skips []string) { // int before func for formatting prettiness
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.log.La("Setting skip list to", skips)
+	t.skips = skips[:]
+	t.log.La("Setting skip list to", t.skips)
 }
 
 // Start starts the go routines for the processing

@@ -42,6 +42,8 @@ func TestPrint(t *testing.T) {
 	app := New("..", 2)
 	gNum := [2]int{1, 5}
 	app.SetNumWorkers(gNum[:])
+	testDir := []string{".git"}
+	app.SetSkipDirs(testDir)
 	app.SetHandler(1, // files
 		func(sp StringPath, chList []chan StringPath, wg *sync.WaitGroup) {
 			fullPath := append(sp.Path[:], sp.Name)
