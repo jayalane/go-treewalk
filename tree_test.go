@@ -10,6 +10,7 @@ import (
 	"testing"
 )
 
+// had trouble with get //root/.bashrc////////// style from this.
 func TestMyJoin(t *testing.T) {
 	a := [5]string{"", "", "", "", "."}
 	b := myJoin(a[:], "/")
@@ -19,6 +20,7 @@ func TestMyJoin(t *testing.T) {
 	}
 }
 
+// even after that passed is was doing dedup.. not ../dedup
 func TestMyJoin2(t *testing.T) {
 	a := [5]string{"..", "dedup", "", "", ""}
 	b := myJoin(a[:], "/")
@@ -28,11 +30,13 @@ func TestMyJoin2(t *testing.T) {
 	}
 }
 
+// a full run of the simple app on ../
+// no validation
 func TestPrint(t *testing.T) {
 	app := New("..", 2)
 	gNum := [2]int{1, 5}
 	app.SetNumWorkers(gNum[:])
-	testDir := []string{".git"}
+	testDir := []string{".git"} // skips .git
 	app.SetSkipDirs(testDir)
 	app.SetHandler(1, // files
 		func(sp StringPath, chList []chan StringPath, wg *sync.WaitGroup) {

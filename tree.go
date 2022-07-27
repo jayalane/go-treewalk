@@ -45,7 +45,7 @@ type Treewalk struct {
 	depth       int
 }
 
-// first a utility function to do joins on string lists (not slices)
+// first a utility function to do joins that treats "" as nil
 func myJoin(strs []string, delim string) string {
 	res := ""
 	seenPrev := false
@@ -91,6 +91,9 @@ func New(firstString string, depth int) Treewalk {
 	return res
 }
 
+// skipDir returns if a prospective dir should be skipped
+// e.g. .snapshot on a NAC. Called from defaultDirHandle, not
+// essential
 func (t Treewalk) skipDir(dir string) bool {
 	for _, x := range t.skips {
 		if x == dir {
@@ -100,6 +103,8 @@ func (t Treewalk) skipDir(dir string) bool {
 	return false
 }
 
+// defaultDirHandle is a default handler in the case this app is doing
+// find type search on a filesystem
 func (t Treewalk) defaultDirHandle(sp StringPath, chs []chan StringPath, wg *sync.WaitGroup) {
 	fullPath := append(sp.Path[:], sp.Name)
 	fn := myJoin(fullPath[:], "/")
@@ -133,7 +138,7 @@ func (t Treewalk) defaultDirHandle(sp StringPath, chs []chan StringPath, wg *syn
 	}
 }
 
-// SetHandler takes a handler and a depth
+// SetHandler takes a handler and a depth and saves the callback/handler
 func (t Treewalk) SetHandler(level int, cb Callback) { // int before func for formatting prettiness
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -154,8 +159,8 @@ func (t Treewalk) SetNumWorkers(numWorkers []int) {
 	}
 }
 
-// SetSkipDirs takes a slice of strings of directories to skip over
-// in the default layer 0 handler
+// SetSkipDirs takes a slice of strings of directories to skip over in
+// the default layer 0 handler
 func (t *Treewalk) SetSkipDirs(skips []string) { // int before func for formatting prettiness
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -198,7 +203,7 @@ func (t Treewalk) Start() {
 	t.wg.Add(1)
 	var sp = StringPath{t.firstString, []string{}}
 	t.chs[0] <- sp
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second) // so there's some work done before exiting.
 	t.wg.Done()
 }
 
