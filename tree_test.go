@@ -28,16 +28,6 @@ func TestMyJoin2(t *testing.T) {
 	}
 }
 
-func TestMyCopy(t *testing.T) {
-	a := [maxPathDepth]string{"", "", "", "", ""}
-	b := []string{".."}
-	myCopy(&a, b)
-	if a[0] != ".." {
-		fmt.Println("Got {", a[0], "} expected { .. }")
-		t.Fatal()
-	}
-}
-
 func TestPrint(t *testing.T) {
 	app := New("..", 2)
 	gNum := [2]int{1, 5}

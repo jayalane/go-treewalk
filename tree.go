@@ -14,10 +14,6 @@ import (
 // MaxDepth is the greatest depth of layers you can have
 const MaxDepth = 5
 
-// maxPathDepth is the largest number of path segments that will be seen for th
-// default handler
-const maxPathDepth = 50
-
 // maxSplits is the largest number of directory names that can be skipped
 const maxSplits = 10
 
@@ -28,7 +24,7 @@ const maxSplits = 10
 // account ID and the bucket name (for S3)
 type StringPath struct {
 	Name string
-	Path [maxPathDepth]string
+	Path []string
 }
 
 // Callback is the thing called for each string read from a channel; it can do anything (print a file)
@@ -69,22 +65,6 @@ func myJoin(strs []string, delim string) string {
 		seenPrev = true
 	}
 	return res
-}
-
-// first a utility function to do joins on string lists (not slices)
-func myCopy(dst *[maxPathDepth]string, src []string) {
-	j := 0
-	for _, s := range src {
-		if s != "" {
-			(*dst)[j] = s
-			j = j + 1
-		}
-		if j > maxPathDepth {
-			fmt.Println("dst is", dst, "src is", src)
-			s := fmt.Sprintln("src len", len(src), "is bigger than maxPathDepth", maxPathDepth)
-			panic(s)
-		}
-	}
 }
 
 // New returns the context needed to start a treewalk
@@ -133,11 +113,12 @@ func (t Treewalk) defaultDirHandle(sp StringPath, chs []chan StringPath, wg *syn
 	}
 	count.Incr("dir-handler-readdir-ok")
 	for _, de := range des {
-		t.log.Ln("Got a dirEntry", de)
+		t.log.Ln("Got a dirEntry", de.Name())
 		count.Incr("dir-handler-dirent-got")
-		pathNew := append(sp.Path[:], sp.Name)
-		var tmp [maxPathDepth]string
-		myCopy(&tmp, pathNew)
+		pathNewA := append(sp.Path[:], sp.Name)
+		pathNewB := make([]string, len(pathNewA))
+		copy(pathNewB, pathNewA)
+		spNew := StringPath{de.Name(), pathNewB[:]}
 		if de.IsDir() {
 			count.Incr("dir-handler-dirent-got-dir")
 			if t.skipDir(de.Name()) {
@@ -146,12 +127,10 @@ func (t Treewalk) defaultDirHandle(sp StringPath, chs []chan StringPath, wg *syn
 				continue
 			}
 			wg.Add(1)
-			spNew := StringPath{de.Name(), tmp}
 			chs[0] <- spNew
 		} else {
 			count.Incr("dir-handler-dirent-got-not-dir")
 			wg.Add(1)
-			spNew := StringPath{de.Name(), tmp}
 			chs[1] <- spNew
 		}
 	}
@@ -199,11 +178,15 @@ func (t Treewalk) Start() {
 				for {
 					select {
 					case d := <-t.chs[layer]:
-						t.log.Ln("Got a thing {", d, "} layer", layer)
+						t.log.Ln("Got a thing {", d.Name, "} layer", layer)
 						if t.cbs[layer] != nil {
+
 							t.cbs[layer](d, t.chs, t.wg)
 						} else if layer == 0 {
 							t.defaultDirHandle(d, t.chs, t.wg)
+						} else {
+							s := fmt.Sprintln("empty callback misconfigured")
+							panic(s)
 						}
 						t.wg.Done()
 					case <-time.After(3 * time.Second):
@@ -216,7 +199,7 @@ func (t Treewalk) Start() {
 		}
 	}
 	t.wg.Add(1)
-	var sp = StringPath{t.firstString, [maxPathDepth]string{}}
+	var sp = StringPath{t.firstString, []string{}}
 	t.chs[0] <- sp
 	time.Sleep(1 * time.Second)
 	t.wg.Done()
