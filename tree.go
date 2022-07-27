@@ -92,10 +92,7 @@ func New(firstString string, depth int) Treewalk {
 }
 
 func (t Treewalk) skipDir(dir string) bool {
-	t.log.La("Checking", dir, "for skipping")
-	t.log.La("List of skips is", t.skips)
 	for _, x := range t.skips {
-		t.log.La("Got x", x)
 		if x == dir {
 			return true
 		}
