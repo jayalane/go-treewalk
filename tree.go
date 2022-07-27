@@ -7,10 +7,16 @@ import (
 	count "github.com/jayalane/go-counter"
 	lll "github.com/jayalane/go-lll"
 	"os"
-	"strings"
 	"sync"
 	"time"
 )
+
+// MaxDepth is the greatest depth of layers you can have
+const MaxDepth = 5
+
+// MaxPathDepth is the largest number of path segments that will be seen for th
+// default handler
+const maxPathDepth = 50
 
 // StringPath is a string that's the current layer ID and the previous
 // layers IDs needed to get to this one. e.g. name would be the file
@@ -19,7 +25,7 @@ import (
 // account ID and the bucket name (for S3)
 type StringPath struct {
 	Name string
-	Path []string
+	Path [maxPathDepth]string
 }
 
 // Callback is the thing called for each string read from a channel; it can do anything (print a file)
@@ -39,8 +45,50 @@ type Treewalk struct {
 	depth       int
 }
 
+// first a utility function to do joins on string lists (not slices)
+func myJoin(strs []string, delim string) string {
+	res := ""
+	seenPrev := false
+	for _, s := range strs {
+		if !seenPrev && s == "" {
+			seenPrev = false
+			continue
+		}
+		if s == "" {
+			continue
+		}
+		if seenPrev {
+			res = res + delim + s
+		} else {
+			res = res + s
+		}
+		seenPrev = true
+	}
+	return res
+}
+
+// first a utility function to do joins on string lists (not slices)
+func myCopy(dst *[maxPathDepth]string, src []string) {
+	j := 0
+	for _, s := range src {
+		if s != "" {
+			(*dst)[j] = s
+			j = j + 1
+		}
+		if j > maxPathDepth {
+			fmt.Println("dst is", dst, "src is", src)
+			s := fmt.Sprintln("src len", len(src), "is bigger than maxPathDepth", maxPathDepth)
+			panic(s)
+		}
+	}
+}
+
 // New returns the context needed to start a treewalk
 func New(firstString string, depth int) Treewalk {
+	if depth > MaxDepth {
+		s := fmt.Sprintln("MaxDepth is", MaxDepth, "depth", depth, "is too high")
+		panic(s)
+	}
 	res := Treewalk{}
 	res.firstString = firstString
 	res.cbs = make([]Callback, depth)
@@ -59,8 +107,9 @@ func New(firstString string, depth int) Treewalk {
 }
 
 func (t Treewalk) defaultDirHandle(sp StringPath, chs []chan StringPath, wg *sync.WaitGroup) {
-	fullPath := append(sp.Path, sp.Name)
-	des, err := os.ReadDir(strings.Join(fullPath, "/"))
+	fullPath := append(sp.Path[:], sp.Name)
+	fn := myJoin(fullPath[:], "/")
+	des, err := os.ReadDir(fn)
 	if err != nil {
 		t.log.La("Error on ReadDir", sp.Name, err)
 		return
@@ -69,17 +118,18 @@ func (t Treewalk) defaultDirHandle(sp StringPath, chs []chan StringPath, wg *syn
 	for _, de := range des {
 		t.log.Ln("Got a dirEntry", de)
 		count.Incr("dir-handler-dirent-got")
+		pathNew := append(sp.Path[:], sp.Name)
+		var tmp [maxPathDepth]string
+		myCopy(&tmp, pathNew)
 		if de.IsDir() {
 			count.Incr("dir-handler-dirent-got-dir")
 			wg.Add(1)
-			pathNew := append(sp.Path, sp.Name)
-			spNew := StringPath{de.Name(), pathNew}
+			spNew := StringPath{de.Name(), tmp}
 			chs[0] <- spNew
 		} else {
 			count.Incr("dir-handler-dirent-got-not-dir")
 			wg.Add(1)
-			pathNew := append(sp.Path, sp.Name)
-			spNew := StringPath{de.Name(), pathNew}
+			spNew := StringPath{de.Name(), tmp}
 			chs[1] <- spNew
 		}
 	}
@@ -134,7 +184,7 @@ func (t Treewalk) Start() {
 		}
 	}
 	t.wg.Add(1)
-	var sp = StringPath{t.firstString, []string{}}
+	var sp = StringPath{t.firstString, [maxPathDepth]string{}}
 	t.chs[0] <- sp
 	time.Sleep(1 * time.Second)
 	t.wg.Done()
