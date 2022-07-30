@@ -7,6 +7,8 @@ import (
 	count "github.com/jayalane/go-counter"
 	lll "github.com/jayalane/go-lll"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -29,8 +31,8 @@ type StringPath struct {
 
 // Callback is the thing called for each string read from a channel; it can do anything (print a file)
 // or push more strings into a channel (if a directory element is another directory)
-// if the callback adds strings to the channel, it should call wg.Add(1); it should not call wg.Done()
-type Callback func(StringPath, []chan StringPath, *sync.WaitGroup)
+// if the callback wants to add more work, call t.SendOn(level, name, old StringPath)
+type Callback func(sp StringPath)
 
 // Treewalk keeps the state involved in walking thru a tree like dataflow
 type Treewalk struct {
@@ -105,9 +107,10 @@ func (t Treewalk) skipDir(dir string) bool {
 
 // defaultDirHandle is a default handler in the case this app is doing
 // find type search on a filesystem
-func (t Treewalk) defaultDirHandle(sp StringPath, chs []chan StringPath, wg *sync.WaitGroup) {
+func (t Treewalk) defaultDirHandle(sp StringPath) {
 	fullPath := append(sp.Path[:], sp.Name)
-	fn := myJoin(fullPath[:], "/")
+	fn := strings.Join(fullPath[:], "/")
+	fn = filepath.Clean(fn)
 	des, err := os.ReadDir(fn)
 	if err != nil {
 		t.log.La("Error on ReadDir", sp.Name, err)
@@ -117,23 +120,37 @@ func (t Treewalk) defaultDirHandle(sp StringPath, chs []chan StringPath, wg *syn
 	for _, de := range des {
 		t.log.Ln("Got a dirEntry", de.Name())
 		count.Incr("dir-handler-dirent-got")
-		pathNewA := append(sp.Path[:], sp.Name)
-		pathNewB := make([]string, len(pathNewA))
-		copy(pathNewB, pathNewA)
-		spNew := StringPath{de.Name(), pathNewB[:]}
 		if de.IsDir() {
-			count.Incr("dir-handler-dirent-got-dir")
 			if t.skipDir(de.Name()) {
 				t.log.Ls("Skipping", de.Name())
 				count.Incr("dir-handler-dirent-skip")
 				continue
 			}
-			wg.Add(1)
-			chs[0] <- spNew
+			t.SendOn(0, de.Name(), sp)
+			count.Incr("dir-handler-dirent-got-dir")
 		} else {
+			t.SendOn(1, de.Name(), sp)
 			count.Incr("dir-handler-dirent-got-not-dir")
-			wg.Add(1)
-			chs[1] <- spNew
+		}
+	}
+}
+
+// SendOn puts the new StringPath from name and old StringPath sp into
+// the channel for the level  The channel isn't exposed so not every callback
+// has to worry if the channel is full and starting more workers or whatever.
+func (t Treewalk) SendOn(level int, name string, sp StringPath) {
+	pathNewA := append(sp.Path[:], sp.Name)
+	pathNewB := make([]string, len(pathNewA))
+	copy(pathNewB, pathNewA)
+	spNew := StringPath{name, pathNewB[:]}
+	t.wg.Add(1)
+	for {
+		select {
+		case t.chs[level] <- spNew:
+			return
+		default:
+			// something to spawn more goroutines
+			continue
 		}
 	}
 }
@@ -183,9 +200,9 @@ func (t Treewalk) Start() {
 						t.log.Ln("Got a thing {", d.Name, "} layer", layer)
 						if t.cbs[layer] != nil {
 
-							t.cbs[layer](d, t.chs, t.wg)
+							t.cbs[layer](d)
 						} else if layer == 0 {
-							t.defaultDirHandle(d, t.chs, t.wg)
+							t.defaultDirHandle(d)
 						} else {
 							s := fmt.Sprintln("empty callback misconfigured")
 							panic(s)

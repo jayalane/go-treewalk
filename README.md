@@ -25,7 +25,7 @@ layer N channel, so for the below example, it's calls Lstat and prints the filen
 ```
 	app := New(".", 2)
 	app.SetHandler(1, // files
-		func(sp StringPath, chList []chan StringPath, wg *sync.WaitGroup) {
+		func(sp StringPath) {
 			fullPath := append(sp.Path, sp.Name)
 			fn := strings.Join(fullPath, "/")
 			fi, err := os.Lstat(fn)

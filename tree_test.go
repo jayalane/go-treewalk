@@ -6,7 +6,6 @@ import (
 	"fmt"
 	count "github.com/jayalane/go-counter"
 	"os"
-	"sync"
 	"testing"
 )
 
@@ -39,7 +38,8 @@ func TestPrint(t *testing.T) {
 	testDir := []string{".git"} // skips .git
 	app.SetSkipDirs(testDir)
 	app.SetHandler(1, // files
-		func(sp StringPath, chList []chan StringPath, wg *sync.WaitGroup) {
+		func(sp StringPath) {
+			fmt.Println("Got called", sp)
 			fullPath := append(sp.Path[:], sp.Name)
 			fn := myJoin(fullPath, "/")
 			fi, err := os.Lstat(fn)
