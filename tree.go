@@ -3,6 +3,7 @@
 package treewalk
 
 import (
+	"errors"
 	"fmt"
 	count "github.com/jayalane/go-counter"
 	lll "github.com/jayalane/go-lll"
@@ -111,7 +112,7 @@ func (t Treewalk) defaultDirHandle(sp StringPath) {
 	fullPath := append(sp.Path[:], sp.Name)
 	fn := strings.Join(fullPath[:], "/")
 	fn = filepath.Clean(fn)
-	des, err := os.ReadDir(fn)
+	des, err := ReadDir(fn)
 	if err != nil {
 		t.log.La("Error on ReadDir", sp.Name, err)
 		return
@@ -199,7 +200,6 @@ func (t Treewalk) Start() {
 					case d := <-t.chs[layer]:
 						t.log.Ln("Got a thing {", d.Name, "} layer", layer)
 						if t.cbs[layer] != nil {
-
 							t.cbs[layer](d)
 						} else if layer == 0 {
 							t.defaultDirHandle(d)
@@ -227,4 +227,36 @@ func (t Treewalk) Start() {
 // Wait waits for the work to all finish
 func (t Treewalk) Wait() {
 	t.wg.Wait()
+}
+
+// ReadDir is a ReadDir with a timeout in case you are calling it on a
+// big NAS that might never reply Default is 3600 seconds (1 hour);
+// use ReadDirTimeout to tune this
+func ReadDir(name string) ([]os.DirEntry, error) {
+	r, e := ReadDirTimeout(name, time.Second*3600)
+	return r, e
+}
+
+// ReadDirTimeout is a ReadDir with a timeout in case you are calling
+// it on a big NAS that might never reply
+func ReadDirTimeout(name string, t time.Duration) ([]os.DirEntry, error) {
+	type res struct {
+		de  []os.DirEntry
+		err error
+	}
+	// start the DirEntry
+	resCh := make(chan res, 2)
+	go func(name string) {
+		de, err := os.ReadDir(name)
+		resCh <- res{de, err}
+	}(name)
+	// now wait for it
+	select {
+	case result := <-resCh:
+		count.Incr("readdir-ok")
+		return result.de, result.err
+	case <-time.After(t):
+		count.Incr("readdir-timeout")
+		return nil, errors.New("Timeout on DirEntry")
+	}
 }

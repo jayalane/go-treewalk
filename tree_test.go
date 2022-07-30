@@ -32,6 +32,7 @@ func TestMyJoin2(t *testing.T) {
 // a full run of the simple app on ../
 // no validation
 func TestPrint(t *testing.T) {
+	count.InitCounters()
 	app := New("..", 2)
 	gNum := [2]int{1, 5}
 	app.SetNumWorkers(gNum[:])
@@ -39,7 +40,6 @@ func TestPrint(t *testing.T) {
 	app.SetSkipDirs(testDir)
 	app.SetHandler(1, // files
 		func(sp StringPath) {
-			fmt.Println("Got called", sp)
 			fullPath := append(sp.Path[:], sp.Name)
 			fn := myJoin(fullPath, "/")
 			fi, err := os.Lstat(fn)
@@ -53,4 +53,5 @@ func TestPrint(t *testing.T) {
 		})
 	app.Start()
 	app.Wait()
+	count.LogCounters()
 }
