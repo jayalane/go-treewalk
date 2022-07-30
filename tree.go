@@ -43,7 +43,7 @@ type Treewalk struct {
 	chs         []chan StringPath
 	skips       []string
 	lock        *sync.RWMutex
-	log         lll.Lll
+	log         *lll.Lll
 	wg          *sync.WaitGroup
 	depth       int
 }
@@ -90,8 +90,15 @@ func New(firstString string, depth int) Treewalk {
 	res.depth = depth
 	res.lock = &sync.RWMutex{}
 	res.wg = &sync.WaitGroup{}
-	res.log = lll.Init("Treewalk", "network") // should be settable
+	log := lll.Init("Treewalk", "network") // should be settable
+	res.log = &log
 	return res
+}
+
+// SetLogLevel configures the underlying logging to either "network"
+// (most logging) "state" "all" or "none"
+func (t Treewalk) SetLogLevel(level string) {
+	t.log.SetLevel(level)
 }
 
 // skipDir returns if a prospective dir should be skipped
@@ -209,7 +216,7 @@ func (t Treewalk) Start() {
 						}
 						t.wg.Done()
 					case <-time.After(3 * time.Second):
-						t.log.La("Giving up on layer", layer, "after 1 minute with no traffic")
+						t.log.La("Giving up on layer", layer, "after 3 seconds with no traffic")
 						t.wg.Done()
 						return
 					}

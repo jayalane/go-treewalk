@@ -36,6 +36,7 @@ func TestPrint(t *testing.T) {
 	app := New("..", 2)
 	gNum := [2]int{1, 5}
 	app.SetNumWorkers(gNum[:])
+	app.SetLogLevel("state")
 	testDir := []string{".git"} // skips .git
 	app.SetSkipDirs(testDir)
 	app.SetHandler(1, // files
