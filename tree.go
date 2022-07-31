@@ -90,7 +90,7 @@ func New(firstString string, depth int) Treewalk {
 	res.depth = depth
 	res.lock = &sync.RWMutex{}
 	res.wg = &sync.WaitGroup{}
-	log := lll.Init("Treewalk", "network") // should be settable
+	log := lll.Init("Treewalk", "state")
 	res.log = &log
 	return res
 }
@@ -157,7 +157,7 @@ func (t Treewalk) SendOn(level int, name string, sp StringPath) {
 		case t.chs[level] <- spNew:
 			return
 		default:
-			// something to spawn more goroutines
+			t.startGoRoutines(level)
 			continue
 		}
 	}
@@ -194,41 +194,46 @@ func (t *Treewalk) SetSkipDirs(skips []string) { // int before func for formatti
 	t.log.La("Setting skip list to", t.skips)
 }
 
+// startGoRoutines starts the go routines for one level
+func (t Treewalk) startGoRoutines(layer int) {
+	for j := 0; j < t.numWorkers[layer]; j++ {
+		t.wg.Add(1) // for this go routine
+		go func(layer int) {
+			t.log.La("Starting go routine for tree walk depth", layer)
+			for {
+				select {
+				case d := <-t.chs[layer]:
+					t.log.Ln("Got a thing {", d.Name, "} layer", layer)
+					if t.cbs[layer] != nil {
+						t.cbs[layer](d)
+					} else if layer == 0 {
+						t.defaultDirHandle(d)
+					} else {
+						s := fmt.Sprintln("empty callback misconfigured")
+						panic(s)
+					}
+					t.wg.Done()
+				case <-time.After(3 * time.Second):
+					t.log.La("Giving up on layer", layer, "after 3 seconds with no traffic")
+					t.wg.Done()
+					return
+				}
+			}
+		}(layer)
+	}
+}
+
 // Start starts the go routines for the processing
 func (t Treewalk) Start() {
-	t.wg.Add(1)
+	t.wg.Add(1) // for this work
 	for i := 0; i < t.depth; i++ {
-		for j := 0; j < t.numWorkers[i]; j++ {
-			t.wg.Add(1)
-			go func(layer int) {
-				t.log.La("Starting go routine for tree walk depth", layer)
-				for {
-					select {
-					case d := <-t.chs[layer]:
-						t.log.Ln("Got a thing {", d.Name, "} layer", layer)
-						if t.cbs[layer] != nil {
-							t.cbs[layer](d)
-						} else if layer == 0 {
-							t.defaultDirHandle(d)
-						} else {
-							s := fmt.Sprintln("empty callback misconfigured")
-							panic(s)
-						}
-						t.wg.Done()
-					case <-time.After(3 * time.Second):
-						t.log.La("Giving up on layer", layer, "after 3 seconds with no traffic")
-						t.wg.Done()
-						return
-					}
-				}
-			}(i)
-		}
+		t.startGoRoutines(i)
 	}
-	t.wg.Add(1)
+	t.wg.Add(1) // for the initial dir
 	var sp = StringPath{t.firstString, []string{}}
 	t.chs[0] <- sp
 	time.Sleep(1 * time.Second) // so there's some work done before exiting.
-	t.wg.Done()
+	t.wg.Done()                 // this work is done
 }
 
 // Wait waits for the work to all finish
