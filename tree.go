@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -32,7 +33,7 @@ type StringPath struct {
 
 // Callback is the thing called for each string read from a channel; it can do anything (print a file)
 // or push more strings into a channel (if a directory element is another directory)
-// if the callback wants to add more work, call t.SendOn(level, name, old StringPath)
+// if the callback wants to add more work, call t.SendOn(layer, name, old StringPath)
 type Callback func(sp StringPath)
 
 // Treewalk keeps the state involved in walking thru a tree like dataflow
@@ -41,6 +42,7 @@ type Treewalk struct {
 	numWorkers  []int
 	cbs         []Callback
 	chs         []chan StringPath
+	chsRunning  []int64
 	skips       []string
 	lock        *sync.RWMutex
 	log         *lll.Lll
@@ -81,6 +83,7 @@ func New(firstString string, depth int) Treewalk {
 	res.cbs = make([]Callback, depth)
 	res.cbs[0] = nil // unneeded
 	res.chs = make([]chan StringPath, depth)
+	res.chsRunning = make([]int64, depth)
 	res.numWorkers = make([]int, depth)
 	res.skips = make([]string, maxSplits)
 	for i := 0; i < depth; i++ {
@@ -144,21 +147,39 @@ func (t Treewalk) defaultDirHandle(sp StringPath) {
 }
 
 // SendOn puts the new StringPath from name and old StringPath sp into
-// the channel for the level  The channel isn't exposed so not every callback
+// the channel for the layer  The channel isn't exposed so not every callback
 // has to worry if the channel is full and starting more workers or whatever.
-func (t Treewalk) SendOn(level int, name string, sp StringPath) {
+func (t Treewalk) SendOn(layer int, name string, sp StringPath) {
 	pathNewA := append(sp.Path[:], sp.Name)
 	pathNewB := make([]string, len(pathNewA))
 	copy(pathNewB, pathNewA)
 	spNew := StringPath{name, pathNewB[:]}
 	t.wg.Add(1)
 	for {
+		num := atomic.LoadInt64(&t.chsRunning[layer])
+		numCtr := fmt.Sprintf("layer-%d-num-running-%d", layer, num)
+		count.Incr(numCtr)
 		select {
-		case t.chs[level] <- spNew:
+		case t.chs[layer] <- spNew:
+			ctrName := fmt.Sprintf("ch-layer-%d-send-sent", layer)
+			count.Incr(ctrName)
 			return
-		default:
-			t.startGoRoutines(level)
-			continue
+		case <-time.After(time.Second * 30):
+			// check if there's routines running
+			numRunning := atomic.LoadInt64(&t.chsRunning[layer])
+			ctrName := fmt.Sprintf("ch-layer-%d-send-timedout-%d", layer, numRunning)
+			count.Incr(ctrName)
+			if numRunning < 1 {
+				ctrName = fmt.Sprintf("ch-layer-%d-send-restart", layer)
+				count.Incr(ctrName)
+				t.log.La("Only", numRunning, "go routines for layer", layer)
+				t.startGoRoutines(layer)
+			} else {
+				ctrName = fmt.Sprintf("ch-layer-%d-send-no-restart", layer)
+				count.Incr(ctrName)
+				t.log.La("Backed up but", numRunning, "go routines for layer", layer)
+			}
+			continue // checking every 30 seconds is fine
 		}
 	}
 }
@@ -198,12 +219,15 @@ func (t *Treewalk) SetSkipDirs(skips []string) { // int before func for formatti
 func (t Treewalk) startGoRoutines(layer int) {
 	for j := 0; j < t.numWorkers[layer]; j++ {
 		t.wg.Add(1) // for this go routine
+		atomic.AddInt64(&t.chsRunning[layer], 1)
 		go func(layer int) {
 			t.log.La("Starting go routine for tree walk depth", layer)
 			for {
 				select {
 				case d := <-t.chs[layer]:
 					t.log.Ln("Got a thing {", d.Name, "} layer", layer)
+					ctrName := fmt.Sprintf("ch-layer-%d-recv", layer)
+					count.Incr(ctrName)
 					if t.cbs[layer] != nil {
 						t.cbs[layer](d)
 					} else if layer == 0 {
@@ -215,7 +239,10 @@ func (t Treewalk) startGoRoutines(layer int) {
 					t.wg.Done()
 				case <-time.After(3 * time.Second):
 					t.log.La("Giving up on layer", layer, "after 3 seconds with no traffic")
+					ctrName := fmt.Sprintf("ch-layer-%d-recv-timeout", layer)
+					count.Incr(ctrName)
 					t.wg.Done()
+					atomic.AddInt64(&t.chsRunning[layer], -1)
 					return
 				}
 			}
@@ -242,10 +269,10 @@ func (t Treewalk) Wait() {
 }
 
 // ReadDir is a ReadDir with a timeout in case you are calling it on a
-// big NAS that might never reply Default is 3600 seconds (1 hour);
+// big NAS that might never reply Default is 60 seconds (1 minute);
 // use ReadDirTimeout to tune this
 func ReadDir(name string) ([]os.DirEntry, error) {
-	r, e := ReadDirTimeout(name, time.Second*3600)
+	r, e := ReadDirTimeout(name, time.Second*60)
 	return r, e
 }
 
@@ -270,5 +297,37 @@ func ReadDirTimeout(name string, t time.Duration) ([]os.DirEntry, error) {
 	case <-time.After(t):
 		count.Incr("readdir-timeout")
 		return nil, errors.New("Timeout on DirEntry")
+	}
+}
+
+// Open is an os.Open with a timeout in case you are calling it on a
+// big NAS that might never reply Default is 60 seconds (1 minute);
+// use OpenTimeout to tune this
+func Open(name string) (*os.File, error) {
+	f, e := OpenTimeout(name, time.Second*60)
+	return f, e
+}
+
+// OpenTimeout is an fs.Open  with a timeout in case you are calling
+// it on a big NAS that might never reply
+func OpenTimeout(name string, t time.Duration) (*os.File, error) {
+	type res struct {
+		f   *os.File
+		err error
+	}
+	// start the DirEntry
+	resCh := make(chan res, 2)
+	go func(name string) {
+		f, err := os.Open(name)
+		resCh <- res{f, err}
+	}(name)
+	// now wait for it
+	select {
+	case result := <-resCh:
+		count.Incr("open-ok")
+		return result.f, result.err
+	case <-time.After(t):
+		count.Incr("open-timeout")
+		return nil, errors.New("Timeout on Open")
 	}
 }
