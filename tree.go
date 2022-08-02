@@ -39,7 +39,7 @@ type Callback func(sp StringPath)
 // Treewalk keeps the state involved in walking thru a tree like dataflow
 type Treewalk struct {
 	firstString string
-	numWorkers  []int
+	numWorkers  []int64
 	cbs         []Callback
 	chs         []chan StringPath
 	chsRunning  []int64
@@ -84,7 +84,7 @@ func New(firstString string, depth int) Treewalk {
 	res.cbs[0] = nil // unneeded
 	res.chs = make([]chan StringPath, depth)
 	res.chsRunning = make([]int64, depth)
-	res.numWorkers = make([]int, depth)
+	res.numWorkers = make([]int64, depth)
 	res.skips = make([]string, maxSplits)
 	for i := 0; i < depth; i++ {
 		res.chs[i] = make(chan StringPath, 1000000)
@@ -156,9 +156,20 @@ func (t Treewalk) SendOn(layer int, name string, sp StringPath) {
 	spNew := StringPath{name, pathNewB[:]}
 	t.wg.Add(1)
 	for {
-		num := atomic.LoadInt64(&t.chsRunning[layer])
-		numCtr := fmt.Sprintf("layer-%d-num-running-%d", layer, num)
+		numRunning := atomic.LoadInt64(&t.chsRunning[layer])
+		if numRunning < t.numWorkers[layer]/2 {
+			ctrName := fmt.Sprintf("ch-layer-%d-send-restart", layer)
+			count.Incr(ctrName)
+			t.log.La("Only", numRunning, "go routines for layer", layer)
+			t.startNGoRoutines(layer, t.numWorkers[layer]-numRunning)
+		} else {
+			ctrName := fmt.Sprintf("ch-layer-%d-send-no-restart", layer)
+			count.Incr(ctrName)
+			t.log.La("Backed up but", numRunning, "go routines for layer", layer)
+		}
+		numCtr := fmt.Sprintf("layer-%d-num-running-%d", layer, numRunning)
 		count.Incr(numCtr)
+		tries := 0
 		select {
 		case t.chs[layer] <- spNew:
 			ctrName := fmt.Sprintf("ch-layer-%d-send-sent", layer)
@@ -166,19 +177,11 @@ func (t Treewalk) SendOn(layer int, name string, sp StringPath) {
 			return
 		case <-time.After(time.Second * 30):
 			// check if there's routines running
-			numRunning := atomic.LoadInt64(&t.chsRunning[layer])
 			ctrName := fmt.Sprintf("ch-layer-%d-send-timedout-%d", layer, numRunning)
 			count.Incr(ctrName)
-			if numRunning < 1 {
-				ctrName = fmt.Sprintf("ch-layer-%d-send-restart", layer)
-				count.Incr(ctrName)
-				t.log.La("Only", numRunning, "go routines for layer", layer)
-				t.startGoRoutines(layer)
-			} else {
-				ctrName = fmt.Sprintf("ch-layer-%d-send-no-restart", layer)
-				count.Incr(ctrName)
-				t.log.La("Backed up but", numRunning, "go routines for layer", layer)
-			}
+			tries++
+			triesCtrName := fmt.Sprintf("ch-layer-%d-retries-%d", layer, tries)
+			count.Incr(triesCtrName)
 			continue // checking every 30 seconds is fine
 		}
 	}
@@ -192,7 +195,7 @@ func (t Treewalk) SetHandler(level int, cb Callback) { // int before func for fo
 }
 
 // SetNumWorkers overrides the number of go routines for each layer (default 5)
-func (t Treewalk) SetNumWorkers(numWorkers []int) {
+func (t Treewalk) SetNumWorkers(numWorkers []int64) {
 	if len(numWorkers) != t.depth {
 		s := fmt.Sprintln("numWorkers length", len(numWorkers), "differs from depth", t.depth)
 		panic(s)
@@ -215,9 +218,9 @@ func (t *Treewalk) SetSkipDirs(skips []string) { // int before func for formatti
 	t.log.La("Setting skip list to", t.skips)
 }
 
-// startGoRoutines starts the go routines for one level
-func (t Treewalk) startGoRoutines(layer int) {
-	for j := 0; j < t.numWorkers[layer]; j++ {
+func (t Treewalk) startNGoRoutines(layer int, num int64) {
+	var j int64
+	for j = 0; j < num; j++ {
 		t.wg.Add(1) // for this go routine
 		atomic.AddInt64(&t.chsRunning[layer], 1)
 		go func(layer int) {
@@ -248,6 +251,11 @@ func (t Treewalk) startGoRoutines(layer int) {
 			}
 		}(layer)
 	}
+}
+
+// startGoRoutines starts the go routines for one level
+func (t Treewalk) startGoRoutines(layer int) {
+	t.startNGoRoutines(layer, t.numWorkers[layer])
 }
 
 // Start starts the go routines for the processing

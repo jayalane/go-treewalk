@@ -34,7 +34,7 @@ func TestMyJoin2(t *testing.T) {
 func TestPrint(t *testing.T) {
 	count.InitCounters()
 	app := New("..", 2)
-	gNum := [2]int{1, 5}
+	gNum := [2]int64{1, 5}
 	app.SetNumWorkers(gNum[:])
 	app.SetLogLevel("state")
 	testDir := []string{".git"} // skips .git
