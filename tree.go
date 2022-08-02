@@ -135,8 +135,8 @@ func (t Treewalk) defaultDirHandle(sp StringPath) {
 				count.Incr("dir-handler-dirent-skip")
 				continue
 			}
-			t.SendOn(0, de.Name(), sp)
 			count.Incr("dir-handler-dirent-got-dir")
+			go t.SendOn(0, de.Name(), sp)
 		} else {
 			t.SendOn(1, de.Name(), sp)
 			count.Incr("dir-handler-dirent-got-not-dir")
