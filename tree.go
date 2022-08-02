@@ -158,7 +158,7 @@ func (t Treewalk) SendOn(layer int, name string, sp StringPath) {
 		if numRunning < t.numWorkers[layer]/2 {
 			ctrName := fmt.Sprintf("ch-layer-%d-send-restart", layer)
 			count.Incr(ctrName)
-			t.log.La("Only", numRunning, "go routines for layer", layer)
+			t.log.Ln("Only", numRunning, "go routines for layer", layer)
 			t.startNGoRoutines(layer, t.numWorkers[layer]-numRunning)
 		}
 		numCtr := fmt.Sprintf("layer-%d-num-running-%d", layer, numRunning)
@@ -218,7 +218,7 @@ func (t Treewalk) startNGoRoutines(layer int, num int64) {
 		t.wg.Add(1) // for this go routine
 		atomic.AddInt64(&t.chsRunning[layer], 1)
 		go func(layer int) {
-			t.log.La("Starting go routine for tree walk depth", layer)
+			t.log.Ln("Starting go routine for tree walk depth", layer)
 			for {
 				select {
 				case d := <-t.chs[layer]:
