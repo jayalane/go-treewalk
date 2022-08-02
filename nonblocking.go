@@ -36,10 +36,10 @@ func ReadDirTimeout(name string, t time.Duration) ([]os.DirEntry, error) {
 	// now wait for it
 	select {
 	case result := <-resCh:
-		count.Incr("readdir-ok")
+		count.IncrSuffix("readdir-ok", suffix)
 		return result.de, result.err
 	case <-time.After(t):
-		count.Incr("readdir-timeout")
+		count.IncrSuffix("readdir-timeout", suffix)
 		return nil, errors.New("Timeout on ReadDir")
 	}
 }
@@ -68,10 +68,10 @@ func OpenTimeout(name string, t time.Duration) (*os.File, error) {
 	// now wait for it
 	select {
 	case result := <-resCh:
-		count.Incr("open-ok")
+		count.IncrSuffix("open-ok", suffix)
 		return result.f, result.err
 	case <-time.After(t):
-		count.Incr("open-timeout")
+		count.IncrSuffix("open-timeout", suffix)
 		return nil, errors.New("Timeout on Open")
 	}
 }
@@ -98,10 +98,10 @@ func LstatTimeout(name string, t time.Duration) (os.FileInfo, error) {
 	}(name)
 	select {
 	case result := <-resCh:
-		count.Incr("lstat-ok")
+		count.IncrSuffix("lstat-ok", suffix)
 		return result.fi, result.err
 	case <-time.After(t):
-		count.Incr("lstat-timeout")
+		count.IncrSuffix("lstat-timeout", suffix)
 		return nil, errors.New("Timeout on Lstat")
 	}
 }

@@ -19,6 +19,9 @@ const MaxDepth = 5
 // maxSplits is the largest number of directory names that can be skipped
 const maxSplits = 10
 
+// suffix is so count doesn't have to use reflection to get caller stack
+const suffix = "treewalk"
+
 // StringPath is a string that's the current layer ID and the previous
 // layers IDs needed to get to this one. e.g. name would be the file
 // name and path would be the containing directories (for a file
@@ -125,21 +128,21 @@ func (t Treewalk) defaultDirHandle(sp StringPath) {
 		t.log.La("Error on ReadDir", sp.Name, err)
 		return
 	}
-	count.Incr("dir-handler-readdir-ok")
+	count.IncrSuffix("dir-handler-readdir-ok", suffix)
 	for _, de := range des {
 		t.log.Ln("Got a dirEntry", de.Name())
-		count.Incr("dir-handler-dirent-got")
+		count.IncrSuffix("dir-handler-dirent-got", suffix)
 		if de.IsDir() {
 			if t.skipDir(de.Name()) {
 				t.log.Ls("Skipping", de.Name())
-				count.Incr("dir-handler-dirent-skip")
+				count.IncrSuffix("dir-handler-dirent-skip", suffix)
 				continue
 			}
-			count.Incr("dir-handler-dirent-got-dir")
+			count.IncrSuffix("dir-handler-dirent-got-dir", suffix)
 			go t.SendOn(0, de.Name(), sp)
 		} else {
 			t.SendOn(1, de.Name(), sp)
-			count.Incr("dir-handler-dirent-got-not-dir")
+			count.IncrSuffix("dir-handler-dirent-got-not-dir", suffix)
 		}
 	}
 }
@@ -157,25 +160,25 @@ func (t Treewalk) SendOn(layer int, name string, sp StringPath) {
 		numRunning := atomic.LoadInt64(&t.chsRunning[layer])
 		if numRunning < t.numWorkers[layer]/2 {
 			ctrName := fmt.Sprintf("ch-layer-%d-send-restart", layer)
-			count.Incr(ctrName)
+			count.IncrSuffix(ctrName, suffix)
 			t.log.Ln("Only", numRunning, "go routines for layer", layer)
 			t.startNGoRoutines(layer, t.numWorkers[layer]-numRunning)
 		}
 		numCtr := fmt.Sprintf("layer-%d-num-running-%d", layer, numRunning)
-		count.Incr(numCtr)
+		count.IncrSuffix(numCtr, suffix)
 		tries := 0
 		select {
 		case t.chs[layer] <- spNew:
 			ctrName := fmt.Sprintf("ch-layer-%d-send-sent", layer)
-			count.Incr(ctrName)
+			count.IncrSuffix(ctrName, suffix)
 			return
 		case <-time.After(time.Second * 30):
 			// check if there's routines running
 			ctrName := fmt.Sprintf("ch-layer-%d-send-timedout-%d", layer, numRunning)
-			count.Incr(ctrName)
+			count.IncrSuffix(ctrName, suffix)
 			tries++
 			triesCtrName := fmt.Sprintf("ch-layer-%d-retries-%d", layer, tries)
-			count.Incr(triesCtrName)
+			count.IncrSuffix(triesCtrName, suffix)
 			continue // checking every 30 seconds is fine
 		}
 	}
@@ -224,7 +227,7 @@ func (t Treewalk) startNGoRoutines(layer int, num int64) {
 				case d := <-t.chs[layer]:
 					t.log.Ln("Got a thing {", d.Name, "} layer", layer)
 					ctrName := fmt.Sprintf("ch-layer-%d-recv", layer)
-					count.Incr(ctrName)
+					count.IncrSuffix(ctrName, suffix)
 					if t.cbs[layer] != nil {
 						t.cbs[layer](d)
 					} else if layer == 0 {
@@ -237,7 +240,7 @@ func (t Treewalk) startNGoRoutines(layer int, num int64) {
 				case <-time.After(3 * time.Second):
 					t.log.La("Giving up on layer", layer, "after 3 seconds with no traffic")
 					ctrName := fmt.Sprintf("ch-layer-%d-recv-timeout", layer)
-					count.Incr(ctrName)
+					count.IncrSuffix(ctrName, suffix)
 					t.wg.Done()
 					atomic.AddInt64(&t.chsRunning[layer], -1)
 					return
