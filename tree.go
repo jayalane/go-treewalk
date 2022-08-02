@@ -162,10 +162,6 @@ func (t Treewalk) SendOn(layer int, name string, sp StringPath) {
 			count.Incr(ctrName)
 			t.log.La("Only", numRunning, "go routines for layer", layer)
 			t.startNGoRoutines(layer, t.numWorkers[layer]-numRunning)
-		} else {
-			ctrName := fmt.Sprintf("ch-layer-%d-send-no-restart", layer)
-			count.Incr(ctrName)
-			t.log.La("Backed up but", numRunning, "go routines for layer", layer)
 		}
 		numCtr := fmt.Sprintf("layer-%d-num-running-%d", layer, numRunning)
 		count.Incr(numCtr)
