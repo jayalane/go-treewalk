@@ -3,7 +3,7 @@ module github.com/jayalane/go-treewalk
 go 1.19
 
 require (
-	github.com/jayalane/go-counter v0.0.0-20220804210308-904e3b8e090c
+	github.com/jayalane/go-counter v0.0.0-20220804214757-69fe041204ed
 	github.com/jayalane/go-lll v0.0.0-20220214223232-792de72bc4d4
 )
 
