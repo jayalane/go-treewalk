@@ -16,7 +16,11 @@ import (
 // big NAS that might never reply Default is 60 seconds (1 minute);
 // use ReadDirTimeout to tune this
 func ReadDir(name string) ([]os.DirEntry, error) {
-	r, e := ReadDirTimeout(name, time.Second*60)
+	var r []os.DirEntry
+	var e error
+	count.TimeFuncRunSuffix("readdir", func() {
+		r, e = ReadDirTimeout(name, time.Second*60)
+	}, suffix)
 	return r, e
 }
 
@@ -48,7 +52,11 @@ func ReadDirTimeout(name string, t time.Duration) ([]os.DirEntry, error) {
 // big NAS that might never reply Default is 60 seconds (1 minute);
 // use OpenTimeout to tune the timeout
 func Open(name string) (*os.File, error) {
-	f, e := OpenTimeout(name, time.Second*60)
+	var f *os.File
+	var e error
+	count.TimeFuncRunSuffix("open", func() {
+		f, e = OpenTimeout(name, time.Second*60)
+	}, suffix)
 	return f, e
 }
 
@@ -79,7 +87,11 @@ func OpenTimeout(name string, t time.Duration) (*os.File, error) {
 // Lstat is an os.Lstat with a timeout. Default is 60 seconds (1 minute);
 // use LstatTimeout to tune the timeout
 func Lstat(name string) (os.FileInfo, error) {
-	fi, e := LstatTimeout(name, time.Second*60)
+	var fi os.FileInfo
+	var e error
+	count.TimeFuncRunSuffix("lstat", func() {
+		fi, e = LstatTimeout(name, time.Second*60)
+	}, suffix)
 	return fi, e
 }
 

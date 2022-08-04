@@ -156,29 +156,30 @@ func (t Treewalk) SendOn(layer int, name string, sp StringPath) {
 	copy(pathNewB, pathNewA)
 	spNew := StringPath{name, pathNewB[:]}
 	t.wg.Add(1)
+	// all the counter names out of the for loop so just run 1 time
+	ctrNameRestart := fmt.Sprintf("ch-layer-%d-send-restart", layer)
+	ctrNameSent := fmt.Sprintf("ch-layer-%d-send-sent", layer)
+	triesCtrName := fmt.Sprintf("ch-layer-%d-retries", layer)
+	numCtr := fmt.Sprintf("layer-%d-num-running", layer)
+	ctrNameTimedOut := fmt.Sprintf("ch-layer-%d-send-timedout", layer)
 	for {
 		numRunning := atomic.LoadInt64(&t.chsRunning[layer])
 		if numRunning < t.numWorkers[layer]/2 {
-			ctrName := fmt.Sprintf("ch-layer-%d-send-restart", layer)
-			count.IncrSuffix(ctrName, suffix)
+			// restart routines if needed
+			count.IncrSuffix(ctrNameRestart, suffix)
 			t.log.Ln("Only", numRunning, "go routines for layer", layer)
 			t.startNGoRoutines(layer, t.numWorkers[layer]-numRunning)
 		}
-		numCtr := fmt.Sprintf("layer-%d-num-running-%d", layer, numRunning)
-		count.IncrSuffix(numCtr, suffix)
+		count.MarkDistributionSuffix(numCtr, float64(numRunning), suffix)
 		tries := 0
 		select {
 		case t.chs[layer] <- spNew:
-			ctrName := fmt.Sprintf("ch-layer-%d-send-sent", layer)
-			count.IncrSuffix(ctrName, suffix)
+			count.IncrSuffix(ctrNameSent, suffix)
 			return
 		case <-time.After(time.Second * 30):
-			// check if there's routines running
-			ctrName := fmt.Sprintf("ch-layer-%d-send-timedout-%d", layer, numRunning)
-			count.IncrSuffix(ctrName, suffix)
+			count.IncrSuffix(ctrNameTimedOut, suffix)
 			tries++
-			triesCtrName := fmt.Sprintf("ch-layer-%d-retries-%d", layer, tries)
-			count.IncrSuffix(triesCtrName, suffix)
+			count.MarkDistributionSuffix(triesCtrName, float64(tries), suffix)
 			continue // checking every 30 seconds is fine
 		}
 	}
@@ -222,16 +223,21 @@ func (t Treewalk) startNGoRoutines(layer int, num int64) {
 		atomic.AddInt64(&t.chsRunning[layer], 1)
 		go func(layer int) {
 			t.log.Ln("Starting go routine for tree walk depth", layer)
+			ctrNameRecv := fmt.Sprintf("ch-layer-%d-recv", layer)
+			ctrNameCB := fmt.Sprintf("ch-layer-%d-cb", layer)
 			for {
 				select {
 				case d := <-t.chs[layer]:
 					t.log.Ln("Got a thing {", d.Name, "} layer", layer)
-					ctrName := fmt.Sprintf("ch-layer-%d-recv", layer)
-					count.IncrSuffix(ctrName, suffix)
+					count.IncrSuffix(ctrNameRecv, suffix)
 					if t.cbs[layer] != nil {
-						t.cbs[layer](d)
+						count.TimeFuncRunSuffix(ctrNameCB, func() {
+							t.cbs[layer](d)
+						}, suffix)
 					} else if layer == 0 {
-						t.defaultDirHandle(d)
+						count.TimeFuncRunSuffix(ctrNameCB, func() {
+							t.defaultDirHandle(d)
+						}, suffix)
 					} else {
 						s := fmt.Sprintln("empty callback misconfigured")
 						panic(s)
@@ -239,8 +245,8 @@ func (t Treewalk) startNGoRoutines(layer int, num int64) {
 					t.wg.Done()
 				case <-time.After(3 * time.Second):
 					t.log.La("Giving up on layer", layer, "after 3 seconds with no traffic")
-					ctrName := fmt.Sprintf("ch-layer-%d-recv-timeout", layer)
-					count.IncrSuffix(ctrName, suffix)
+					ctrNameRecvTimeout := fmt.Sprintf("ch-layer-%d-recv-timeout", layer)
+					count.IncrSuffix(ctrNameRecvTimeout, suffix)
 					t.wg.Done()
 					atomic.AddInt64(&t.chsRunning[layer], -1)
 					return
