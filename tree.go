@@ -28,8 +28,9 @@ const suffix = "treewalk"
 // search, or name would be the object Key and the path would be the
 // account ID and the bucket name (for S3)
 type StringPath struct {
-	Name string
-	Path []string
+	Name  string
+	Path  []string
+	Value interface{} // really will just be de.DirEntry
 }
 
 // Callback is the thing called for each string read from a channel; it can do anything (print a file)
@@ -131,8 +132,9 @@ func (t Treewalk) defaultDirHandle(sp StringPath) {
 	count.MarkDistributionSuffix("dir-handler-readdir-len", float64(len(des)), suffix)
 	count.IncrSuffix("dir-handler-readdir-ok", suffix)
 	for _, de := range des {
-		t.log.Ln("Got a dirEntry", de.Name())
 		count.IncrSuffix("dir-handler-dirent-got", suffix)
+		t.log.Ln("Got a dirEntry", de.Name())
+		spNew := StringPath{Name: de.Name(), Path: fullPath, Value: de}
 		if de.IsDir() {
 			if t.skipDir(de.Name()) {
 				t.log.Ls("Skipping", de.Name())
@@ -140,22 +142,23 @@ func (t Treewalk) defaultDirHandle(sp StringPath) {
 				continue
 			}
 			count.IncrSuffix("dir-handler-dirent-got-dir", suffix)
-			go t.SendOn(0, de.Name(), sp)
+			go t.SendOn(0, de.Name(), spNew)
 		} else {
-			t.SendOn(1, de.Name(), sp)
+			t.SendOn(1, de.Name(), spNew)
 			count.IncrSuffix("dir-handler-dirent-got-not-dir", suffix)
 		}
 	}
 }
 
 // SendOn puts the new StringPath from name and old StringPath sp into
-// the channel for the layer  The channel isn't exposed so not every callback
-// has to worry if the channel is full and starting more workers or whatever.
+// the channel for the layer The channel isn't exposed so not every
+// callback has to worry if the channel is full and starting more
+// workers or whatever. It will block the caller but also will start
+// more workers as needed
 func (t Treewalk) SendOn(layer int, name string, sp StringPath) {
-	pathNewA := append(sp.Path[:], sp.Name)
-	pathNewB := make([]string, len(pathNewA))
-	copy(pathNewB, pathNewA)
-	spNew := StringPath{name, pathNewB[:]}
+	pathNew := make([]string, len(sp.Path[:]))
+	copy(pathNew, sp.Path[:])
+	spNew := StringPath{name, pathNew[:], sp.Value}
 	t.wg.Add(1)
 	// all the counter names out of the for loop so just run 1 time
 	ctrNameRestart := fmt.Sprintf("ch-layer-%d-send-restart", layer)
@@ -269,7 +272,7 @@ func (t Treewalk) Start() {
 		t.startGoRoutines(i)
 	}
 	t.wg.Add(1) // for the initial dir
-	var sp = StringPath{t.firstString, []string{}}
+	var sp = StringPath{t.firstString, []string{}, nil}
 	t.chs[0] <- sp
 	time.Sleep(1 * time.Second) // so there's some work done before exiting.
 	t.wg.Done()                 // this work is done
