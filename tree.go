@@ -128,6 +128,7 @@ func (t Treewalk) defaultDirHandle(sp StringPath) {
 		t.log.La("Error on ReadDir", sp.Name, err)
 		return
 	}
+	count.MarkDistributionSuffix("dir-handler-readdir-len", float64(len(des)), suffix)
 	count.IncrSuffix("dir-handler-readdir-ok", suffix)
 	for _, de := range des {
 		t.log.Ln("Got a dirEntry", de.Name())
