@@ -5,7 +5,9 @@ package treewalk
 import (
 	"fmt"
 	count "github.com/jayalane/go-counter"
+	"io/fs"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -33,7 +35,7 @@ func TestMyJoin2(t *testing.T) {
 // no validation
 func TestPrint(t *testing.T) {
 	count.InitCounters()
-	app := New("..", 2)
+	app := New("/home", 2)
 	gNum := [2]int64{1, 5}
 	app.SetNumWorkers(gNum[:])
 	app.SetLogLevel("state")
@@ -42,12 +44,25 @@ func TestPrint(t *testing.T) {
 	app.SetHandler(1, // files
 		func(sp StringPath) {
 			fullPath := append(sp.Path[:], sp.Name)
-			fn := myJoin(fullPath, "/")
-			fi, err := os.Lstat(fn)
+			fn := strings.Join(fullPath, "/")
+			var fi fs.FileInfo
+			var err error
+			de, ok := sp.Value.(fs.DirEntry)
+			if ok {
+				fi, err = de.Info()
+				count.Incr("Used de")
+			} else {
+				count.Incr("Used Lstat")
+				fi, err = Lstat(fn)
+			}
 			if err != nil {
 				app.log.La("Stat error on", fn, err)
 				count.Incr("file-handler-stat-error")
 				return
+			}
+			isSymLink := fi.Mode()&os.ModeSymlink == os.ModeSymlink
+			if isSymLink { // the logic specific to this app
+				fmt.Println("Is Symlink")
 			}
 			fmt.Println(fn, fi.ModTime())
 			count.Incr("file-handler-ok")

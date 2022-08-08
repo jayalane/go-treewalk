@@ -3,9 +3,12 @@
 package treewalk
 
 import (
+	"errors"
 	"fmt"
 	count "github.com/jayalane/go-counter"
 	lll "github.com/jayalane/go-lll"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -124,29 +127,43 @@ func (t Treewalk) defaultDirHandle(sp StringPath) {
 	fullPath := append(sp.Path[:], sp.Name)
 	fn := strings.Join(fullPath[:], "/")
 	fn = filepath.Clean(fn)
-	des, err := ReadDir(fn)
+	dir, err := os.Open(fn)
 	if err != nil {
-		t.log.La("Error on ReadDir", sp.Name, err)
+		t.log.La("Error on OpenDir", sp.Name, err)
+		count.IncrSuffix("dir-handler-readdir-open-err", suffix)
 		return
 	}
-	count.MarkDistributionSuffix("dir-handler-readdir-len", float64(len(des)), suffix)
-	count.IncrSuffix("dir-handler-readdir-ok", suffix)
-	for _, de := range des {
-		count.IncrSuffix("dir-handler-dirent-got", suffix)
-		t.log.Ln("Got a dirEntry", de.Name())
-		spNew := StringPath{Name: de.Name(), Path: fullPath, Value: de}
-		if de.IsDir() {
-			if t.skipDir(de.Name()) {
-				t.log.Ls("Skipping", de.Name())
-				count.IncrSuffix("dir-handler-dirent-skip", suffix)
-				continue
+	dirEntrylen := 0
+	for {
+		des, err := dir.Readdir(50) // tunable ?
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
 			}
-			count.IncrSuffix("dir-handler-dirent-got-dir", suffix)
-			go t.SendOn(0, de.Name(), spNew)
-		} else {
-			t.SendOn(1, de.Name(), spNew)
-			count.IncrSuffix("dir-handler-dirent-got-not-dir", suffix)
+			t.log.La("Error on OpenDir", sp.Name, err)
+			count.IncrSuffix("dir-handler-readdir-open-err", suffix)
+			return
 		}
+		dirEntrylen += len(des)
+		for _, de := range des {
+			spNew := StringPath{Name: de.Name(), Path: fullPath, Value: de}
+			t.log.Ln("Got a dirEntry", de.Name())
+			count.IncrSuffix("dir-handler-dirent-got", suffix)
+			if de.IsDir() {
+				if t.skipDir(de.Name()) {
+					t.log.Ls("Skipping", de.Name())
+					count.IncrSuffix("dir-handler-dirent-skip", suffix)
+					continue
+				}
+				count.IncrSuffix("dir-handler-dirent-got-dir", suffix)
+				go t.SendOn(0, de.Name(), spNew) // the go is needed to avoid a deadlock
+			} else {
+				t.SendOn(1, de.Name(), spNew)
+				count.IncrSuffix("dir-handler-dirent-got-not-dir", suffix)
+			}
+		}
+		count.MarkDistributionSuffix("dir-handler-readdir-len", float64(len(des)), suffix)
+		count.IncrSuffix("dir-handler-readdir-ok", suffix)
 	}
 }
 
