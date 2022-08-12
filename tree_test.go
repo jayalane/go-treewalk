@@ -5,6 +5,7 @@ package treewalk
 import (
 	"fmt"
 	count "github.com/jayalane/go-counter"
+	timeout "github.com/jayalane/go-syscalls-timeout"
 	"io/fs"
 	"os"
 	"strings"
@@ -53,7 +54,7 @@ func TestPrint(t *testing.T) {
 				count.Incr("Used de")
 			} else {
 				count.Incr("Used Lstat")
-				fi, err = Lstat(fn)
+				fi, err = timeout.Lstat(fn)
 			}
 			if err != nil {
 				app.log.La("Stat error on", fn, err)
