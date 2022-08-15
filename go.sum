@@ -1,7 +1,7 @@
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/jayalane/go-counter v0.0.0-20220804214757-69fe041204ed h1:rC4nUdHyH1m3UT0fauigIvRdWPW/hCUeCMKNsMdhkkQ=
-github.com/jayalane/go-counter v0.0.0-20220804214757-69fe041204ed/go.mod h1:m/beUWIhKMF9Phow+TmQOnDwllKd7CqtfkwklfI0s7E=
+github.com/jayalane/go-counter v0.0.0-20220815165741-b1aa777f2b01 h1:7V2Nf+GQDl1zWogYRiRKWw8Vz1SFQrts1D7xnpqrFG8=
+github.com/jayalane/go-counter v0.0.0-20220815165741-b1aa777f2b01/go.mod h1:m/beUWIhKMF9Phow+TmQOnDwllKd7CqtfkwklfI0s7E=
 github.com/jayalane/go-lll v0.0.0-20220214223232-792de72bc4d4 h1:wsF1rNbUCFqvW2Bqc8j4EDkE1JwRw0k0ndRUWuYFeZ8=
 github.com/jayalane/go-lll v0.0.0-20220214223232-792de72bc4d4/go.mod h1:fYJ0cAfSJxYQ8+I8+lHznOVQcsEXhNakwzIX8MMTn7k=
 github.com/jayalane/go-syscalls-timeout v0.0.0-20220812004031-30a065e0ece8 h1:LhtX5VEcSZw/82Pkqf9/b5+3xivrXYUEkThzTH0mcvs=
