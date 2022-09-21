@@ -13,6 +13,8 @@ in a jar file (directory => more directories, files, or jar files)
 "find all objects in this S3 bucket with such and such property"
 (accounts => buckets => keys => objects).
 
+Examples of three little apps that use it are in https://github.com/jayalane/go-searchstat
+
 The test file shows how a main.go could call it.  
 
 New specifies the initial string to put into the layer 0 channel to
