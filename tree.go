@@ -99,7 +99,7 @@ func New(firstString string, depth int) Treewalk {
 	res.lock = &sync.RWMutex{}
 	res.wg = &sync.WaitGroup{}
 	log := lll.Init("Treewalk", "state")
-	res.log = &log
+	res.log = log
 	return res
 }
 
