@@ -3,9 +3,8 @@ module github.com/jayalane/go-treewalk
 go 1.20
 
 require (
-	github.com/jayalane/go-counter v0.0.0-20230309045251-696a3bbcd44e
-	github.com/jayalane/go-lll v0.0.0-20230309045553-4d9872d4d53e
-	github.com/jayalane/go-syscalls-timeout v0.0.0-20221206021238-4f20d90eb84c
+	github.com/jayalane/go-counter v0.0.0-20230310202406-1b6cd6f6120a
+	github.com/jayalane/go-lll v0.0.0-20230319184427-bcaed09a676c
 )
 
 require (
