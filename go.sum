@@ -1,9 +1,9 @@
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/jayalane/go-counter v0.0.0-20240701011447-c401b9516859 h1:+NJxUuAMd9Cd+Ch5vgOIJEvVv0FRhs/UHn8GMfwJIHk=
-github.com/jayalane/go-counter v0.0.0-20240701011447-c401b9516859/go.mod h1:UljiSOhE0XxrhKIKw8CvrtVQo4cV71/08RzTDjYxdmk=
-github.com/jayalane/go-lll v0.0.0-20240701032621-2f3552fc55a4 h1:Ma8spEciuPvSHlbrv3yvbrAFvAuIojZFgzwtWpM2BQU=
-github.com/jayalane/go-lll v0.0.0-20240701032621-2f3552fc55a4/go.mod h1:DEnfz7H4PilkrCTprFyxon3Xfm7KIRvuKeEt9sM9bLU=
+github.com/jayalane/go-counter v0.0.0-20240705210921-ef55ebe2f756 h1:hOgyVo4XSFAf+21AVDw9wsDpuq/gbpZYgutp7NlL5r8=
+github.com/jayalane/go-counter v0.0.0-20240705210921-ef55ebe2f756/go.mod h1:UljiSOhE0XxrhKIKw8CvrtVQo4cV71/08RzTDjYxdmk=
+github.com/jayalane/go-lll v0.0.0-20240705211819-06fc7741d960 h1:b4f2kW4iYDtPcoB0WztxaaawSEKJ+Lt+xII/+dFlSd0=
+github.com/jayalane/go-lll v0.0.0-20240705211819-06fc7741d960/go.mod h1:60f1UKTrTo+WonBtd8/+7/F5W3J9cYBojl/O1aUtXZA=
 github.com/jayalane/go-syscalls-timeout v0.0.0-20240701051739-5c6bd8e1d902 h1:7VCmKHIRwrrNna8/wJqla7PTlWTepZxHlq8DRm5LnGE=
 github.com/jayalane/go-syscalls-timeout v0.0.0-20240701051739-5c6bd8e1d902/go.mod h1:MHU3v9lyR19R7r3ooIrbJBHzhdPVzODLQzGRK/wzf64=
 github.com/jonboulle/clockwork v0.4.0 h1:p4Cf1aMWXnXAUh8lVfewRBx1zaTSYKrKMF2g3ST4RZ4=
