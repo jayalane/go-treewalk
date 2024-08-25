@@ -1,11 +1,11 @@
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/jayalane/go-counter v0.0.0-20240705210921-ef55ebe2f756 h1:hOgyVo4XSFAf+21AVDw9wsDpuq/gbpZYgutp7NlL5r8=
-github.com/jayalane/go-counter v0.0.0-20240705210921-ef55ebe2f756/go.mod h1:UljiSOhE0XxrhKIKw8CvrtVQo4cV71/08RzTDjYxdmk=
+github.com/jayalane/go-counter v0.0.0-20240823233109-e4d54c72d752 h1:sZoWOuK5qxnLfp/+fhd/RBevpCSiNckFMnMYNiLbWRY=
+github.com/jayalane/go-counter v0.0.0-20240823233109-e4d54c72d752/go.mod h1:gtPW85Iz9tzWJi+gKwICh2bS5iMu7YSDDL+IPdbRKIo=
 github.com/jayalane/go-lll v0.0.0-20240705211819-06fc7741d960 h1:b4f2kW4iYDtPcoB0WztxaaawSEKJ+Lt+xII/+dFlSd0=
 github.com/jayalane/go-lll v0.0.0-20240705211819-06fc7741d960/go.mod h1:60f1UKTrTo+WonBtd8/+7/F5W3J9cYBojl/O1aUtXZA=
-github.com/jayalane/go-syscalls-timeout v0.0.0-20240701051739-5c6bd8e1d902 h1:7VCmKHIRwrrNna8/wJqla7PTlWTepZxHlq8DRm5LnGE=
-github.com/jayalane/go-syscalls-timeout v0.0.0-20240701051739-5c6bd8e1d902/go.mod h1:MHU3v9lyR19R7r3ooIrbJBHzhdPVzODLQzGRK/wzf64=
+github.com/jayalane/go-syscalls-timeout v0.0.0-20240705213243-830c65b670f2 h1:A0J4snrPcvlGTyhp47tG97J54RTGExhBB5mexhr9cJQ=
+github.com/jayalane/go-syscalls-timeout v0.0.0-20240705213243-830c65b670f2/go.mod h1:4Tv7njF35gsdxppGn0BdV7HGU24szHW9vxyA9N9b1CY=
 github.com/jonboulle/clockwork v0.4.0 h1:p4Cf1aMWXnXAUh8lVfewRBx1zaTSYKrKMF2g3ST4RZ4=
 github.com/jonboulle/clockwork v0.4.0/go.mod h1:xgRqUGwRcjKCO1vbZUEtSLrqKoPSsUpK7fnezOII0kc=
 github.com/lestrrat-go/envload v0.0.0-20180220234015-a3eb8ddeffcc h1:RKf14vYWi2ttpEmkA4aQ3j4u9dStX2t4M8UM6qqNsG8=
